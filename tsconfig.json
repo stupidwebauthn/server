@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "module": "Preserve",
+    "target": "ES2017",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx"
+  }
+}

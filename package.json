@@ -1,0 +1,24 @@
+{
+  "name": "server",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "start": "bun run src/index.ts",
+    "dev": "bun run --hot src/index.ts"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.2.2",
+    "@passwordless-id/webauthn": "^2.1.1",
+    "base64-url": "^2.3.3",
+    "dayjs": "^1.11.13",
+    "hono": "^4.6.2",
+    "jose": "^5.9.3",
+    "nodemailer": "^6.9.15",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/base64-url": "^2.2.2",
+    "@types/bun": "latest",
+    "@types/nodemailer": "^6.4.16"
+  }
+}

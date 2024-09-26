@@ -1,0 +1,17 @@
+SMTP_HOST=127.0.0.1
+SMTP_PORT=8125
+SMTP_SECURE=false
+SMTP_USERNAME=user@example.com
+SMTP_PASSWORD=password
+SMTP_FROM=user@example.com
+
+EMAIL_VALIDATION_URL=http://localhost:5178/register
+WEBAUTHN_ORIGIN=http://localhost:5178
+
+COOKIE_DOMAIN=localhost
+COOKIE_SECURE=false
+
+COOKIE_SECRET=zH4NRP1HMALxxCFnRZABFA7GOJtzU_gIj02alfL1lvI
+
+DATABASE_PATH=./data/db.sqlite
+EMAIL_TEMPLATE_PATH=data/email.html

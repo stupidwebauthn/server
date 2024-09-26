@@ -1,0 +1,6 @@
+# deps
+node_modules/
+.env
+data/email.html
+data/db.sqlite
+.DS_Store
