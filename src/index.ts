@@ -44,6 +44,10 @@ const transporter = nodemailer.createTransport({
     user: config.SMTP_USERNAME,
     pass: config.SMTP_PASSWORD,
   },
+  tls: {
+    // do not fail on invalid certs
+    rejectUnauthorized: false,
+  },
 } as nodemailer.TransportOptions);
 
 const emailTemplate = await EmailTemplate(config.EMAIL_TEMPLATE_PATH);
