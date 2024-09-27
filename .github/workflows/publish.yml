@@ -16,7 +16,7 @@ jobs:
         with:
           dockerfile: .
           image-name: server
-          tags: latest ${{ github.ref_name }}
+          tags: latest
           push-branches: main
         env:
           REGISTRY_USERNAME: ${{ github.actor }}
