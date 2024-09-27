@@ -3,18 +3,26 @@ import * as jose from "jose";
 import * as cookie from "./cookie";
 import base64url from "base64-url";
 
+const secret = "aorsduyhvzckaf23ulsrtdoapth23risearsoisetn3";
+
 test("Test that signing works", async () => {
-  const secret = cookie.encodeSecret("aorsduyhvzckaf23ulsrtdoapth23risearsoisetn3");
-  const token = await new jose.SignJWT({}).setProtectedHeader({ alg: "HS256" }).sign(secret);
-  expect(token).toStartWith("eyJhbGciOiJIUzI1NiJ9.e30.");
+  const key = cookie.encodeSecret(secret);
+  const token = await new jose.SignJWT({ hidden: "secret" }).setProtectedHeader({ alg: "HS256" }).sign(key);
+  expect(token).toStartWith("eyJhbGciOiJIUzI1NiJ9.");
+
+  const { payload } = await jose.jwtVerify(token, key);
+  expect(payload.hidden).toBe("secret");
 });
 test("Test that encryption works", async () => {
-  const secret = cookie.encodeSecret("aorsduyhvzckaf23ulsrtdoapth23risearsoisetn3");
-  const token = await new jose.EncryptJWT()
+  const key = cookie.encodeSecret(secret);
+  const token = await new jose.EncryptJWT({ hidden: "secret" })
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
     .setIssuedAt()
-    .encrypt(secret);
+    .encrypt(key);
   expect(token).toStartWith("eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0.");
+
+  const { payload } = await jose.jwtDecrypt(token, key);
+  expect(payload.hidden).toBe("secret");
 });
 
 test("Url base64", () => {
