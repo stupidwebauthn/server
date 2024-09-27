@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Build Docker Images
         uses: philips-software/docker-ci-scripts@v4.5.0
         with:
@@ -19,6 +21,7 @@ jobs:
           tags: latest v0 v0.1 ${{ github.ref_name }}
           push-branches: main
         env:
-          REGISTRY_USERNAME: lil5
-          REGISTRY_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          REGISTRY_URL: docker.io
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_URL: ghcr.io/stupidwebauthn
+          GITHUB_ORGANIZATION: stupidwebauthn
