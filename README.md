@@ -1,6 +1,12 @@
 # Stupid Webauthn Server
 
-## Installation
+## Docker
+
+```
+docker pull lil5/stupidwebauthn-server:latest
+```
+
+## Manual Installation
 
 To install dependencies:
 

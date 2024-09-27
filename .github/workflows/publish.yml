@@ -16,10 +16,9 @@ jobs:
         with:
           dockerfile: .
           image-name: server
-          tags: latest
+          tags: latest v0 v0.1 ${{ github.ref_name }}
           push-branches: main
         env:
-          REGISTRY_USERNAME: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REGISTRY_URL: ghcr.io/stupidwebauthn
-          GITHUB_ORGANIZATION: stupidwebauthn
+          REGISTRY_USERNAME: lil5
+          REGISTRY_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          REGISTRY_URL: docker.io
