@@ -9,6 +9,8 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Build Docker Images
         uses: philips-software/docker-ci-scripts@v4.5.0
         with:
