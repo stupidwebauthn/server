@@ -39,15 +39,21 @@ const db = new DB(config.DATABASE_PATH!);
 const transporter = nodemailer.createTransport({
   host: config.SMTP_HOST,
   port: config.SMTP_PORT,
-  secure: config.SMTP_SECURE !== "false",
+  secure: config.SMTP_SECURE === "true",
   auth: {
     user: config.SMTP_USERNAME,
     pass: config.SMTP_PASSWORD,
   },
-  tls: {
-    // do not fail on invalid certs
-    rejectUnauthorized: false,
-  },
+  requireTLS: config.SMTP_SECURE === "tls",
+  tls:
+    config.SMTP_SECURE === "tls"
+      ? {
+          ciphers: "SSLv3",
+        }
+      : {
+          // do not fail on invalid certs
+          rejectUnauthorized: false,
+        },
 } as nodemailer.TransportOptions);
 
 const emailTemplate = await EmailTemplate(config.EMAIL_TEMPLATE_PATH);
