@@ -1,4 +1,4 @@
-# Server
+# Stupid Webauthn Server
 
 ## Installation
 

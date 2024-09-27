@@ -1,0 +1,23 @@
+name: Publish to Docker Images
+on:
+  release:
+    types: [published]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Build Docker Images
+        uses: philips-software/docker-ci-scripts@v4.5.0
+        with:
+          dockerfile: .
+          image-name: server
+          tags: latest ${{ github.ref_name }}
+          push-branches: main
+        env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_URL: ghcr.io/stupidwebauthn
+          GITHUB_ORGANIZATION: stupidwebauthn
