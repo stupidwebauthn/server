@@ -57,11 +57,10 @@ const transporter = nodemailer.createTransport({
 } as nodemailer.TransportOptions);
 
 const emailTemplate = await EmailTemplate(config.EMAIL_TEMPLATE_PATH);
-const app = new Hono();
 
 console.log(config);
 
-app
+const app = new Hono()
   // register or login via email and new passkey
   .get("/auth/register/email/challenge", async (c) => {
     const email = c.req.query("email");
