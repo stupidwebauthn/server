@@ -13,15 +13,15 @@ import { StatusCode } from "hono/utils/http-status";
 import config from "./config";
 import base64url from "base64-url";
 
-interface JwtPayloadWithUserId extends JWTPayload {
-  user_id: number;
+interface JwtPayloadWithEmail extends JWTPayload {
+  email: string;
 }
 interface JwtPayloadWithEmailChallenge extends JWTPayload {
   challenge: string;
   email: string;
 }
-interface JwtPayloadWithUserIdChallenge extends JWTPayload {
-  user_id: number;
+interface JwtPayloadWithEmailChallenge extends JWTPayload {
+  email: string;
   challenge: string;
 }
 interface JwtPayloadWithUserIdJwtVersion extends JWTPayload {
@@ -114,24 +114,24 @@ const app = new Hono()
       throw new HTTPException(401, { message: "Invalid email challenge, please register again" });
     if (!payload.email) throw new HTTPException(401, { message: "Invalid email" });
 
-    const user_id = db.userCreateOrFail(payload.email);
+    db.userCreateOrFail(payload.email);
 
     deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
 
-    await cookie.jwtSignCreate<JwtPayloadWithUserId>(
+    await cookie.jwtSignCreate<JwtPayloadWithEmail>(
       c,
       COOKIE_VALID_USER_WITHOUT_PASSKEY,
       cookie_expires_short(),
       cookie_secret,
       {
-        user_id,
+        email: payload.email,
       }
     );
     return c.text("", 201);
   })
 
   .post("/auth/register/passkey/challenge", async (c) => {
-    const payload = await cookie.jwtSignVerifyRead<JwtPayloadWithUserId>(
+    const payload = await cookie.jwtSignVerifyRead<JwtPayloadWithEmail>(
       c,
       COOKIE_VALID_USER_WITHOUT_PASSKEY,
       cookie_secret
@@ -139,21 +139,21 @@ const app = new Hono()
 
     const challenge = server.randomChallenge();
 
-    await cookie.jwtEncryptCreate<JwtPayloadWithUserIdChallenge>(
+    await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_VALID_USER_REGISTER_PASSKEY,
       cookie_expires_short(),
       cookie_secret,
       {
-        user_id: payload.user_id,
         challenge,
+        email: payload.email,
       }
     );
-    return c.json({ challenge });
+    return c.json({ challenge, email: payload.email });
   })
 
   .post("/auth/register/passkey/validate", async (c) => {
-    const payload = await cookie.jwtDecryptRead<JwtPayloadWithUserIdChallenge>(
+    const payload = await cookie.jwtDecryptRead<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_VALID_USER_REGISTER_PASSKEY,
       cookie_secret
@@ -163,12 +163,14 @@ const app = new Hono()
       challenge: payload.challenge,
       origin: config.WEBAUTHN_ORIGIN,
     });
-    const user = await db.userGetById(payload.user_id);
+    const user = await db.userGetByEmail(payload.email);
+    if (body.user.name !== user.email)
+      throw new HTTPException(400, { message: "Attempted to validate with a different email" });
 
-    db.credentialAdd(payload.user_id, registrationParsed.authenticator.name, registrationParsed.credential);
+    db.credentialAdd(user.id, registrationParsed.authenticator.name, registrationParsed.credential);
 
     await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_AUTH, cookie_expires_long(), cookie_secret, {
-      user_id: payload.user_id,
+      user_id: user.id,
       jwt_version: user.jwt_version,
     });
     deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
@@ -181,17 +183,17 @@ const app = new Hono()
     if (!email) throw new HTTPException(401, { message: "Invalid email" });
 
     const user = await db.userGetByEmail(email);
-    const credentials = await db.credentialListByUserIdToSelect(user.id);
+    const credentials = await db.credentialInfosByUserId(user.id);
     const challenge = server.randomChallenge();
 
-    await cookie.jwtEncryptCreate<JwtPayloadWithUserIdChallenge>(
+    await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_LOGIN_CHALLENGE,
       cookie_expires_short(),
       cookie_secret,
       {
-        challenge: challenge,
-        user_id: user.id,
+        challenge,
+        email: user.email,
       }
     );
 
@@ -203,16 +205,14 @@ const app = new Hono()
 
   .post("/auth/login/validate", async (c) => {
     const payload = await cookie
-      .jwtDecryptRead<JwtPayloadWithUserIdChallenge>(c, COOKIE_LOGIN_CHALLENGE, cookie_secret)
+      .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_LOGIN_CHALLENGE, cookie_secret)
       .catch((err) => {
         throw new HTTPException(400, { message: `Must be opened in the same browser, mac 30 min after email is sent` });
       });
-    const cred_id = parseInt(c.req.query("cred_id") || "");
-    if (!cred_id) throw new HTTPException(401, { message: "Invalid credential id" });
     const body = (await c.req.json()) as AuthenticationJSON;
 
-    const user = db.userGetById(payload.user_id);
-    const credentialKey = db.credentialByIdAndUserId(payload.user_id, cred_id);
+    const user = db.userGetByEmail(payload.email);
+    const credentialKey = db.credentialByIdAndUserId(user.id, body.id);
 
     /* const authenticationParsed = */ await server.verifyAuthentication(body, credentialKey.credential_json, {
       challenge: payload.challenge,
@@ -223,7 +223,7 @@ const app = new Hono()
     db.credentialUsedNow(credentialKey.id);
 
     await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_AUTH, cookie_expires_long(), cookie_secret, {
-      user_id: payload.user_id,
+      user_id: user.id,
       jwt_version: user.jwt_version,
     });
     deleteCookie(c, COOKIE_LOGIN_CHALLENGE);
@@ -254,18 +254,12 @@ const app = new Hono()
         if (err.status >= 500) throw err;
       }
 
-      deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
-      deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
-      deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
       deleteCookie(c, COOKIE_AUTH);
       c.status(status);
       return c.json({ message: err?.message || err });
     }
   })
   .get("/auth/logout", async (c) => {
-    deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
-    deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
-    deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
     deleteCookie(c, COOKIE_AUTH);
     return c.text("", 201);
   })
