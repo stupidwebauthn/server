@@ -14,6 +14,7 @@ function Config() {
     COOKIE_SECRET: z.string(),
     DATABASE_PATH: z.string(),
     EMAIL_TEMPLATE_PATH: z.string(),
+    GDPR_DELETE_DELAY_DAYS: z.number(),
   });
 
   return schema.parse({
@@ -30,6 +31,7 @@ function Config() {
     COOKIE_SECRET: Bun.env.COOKIE_SECRET,
     DATABASE_PATH: Bun.env.DATABASE_PATH,
     EMAIL_TEMPLATE_PATH: Bun.env.EMAIL_TEMPLATE_PATH,
+    GDPR_DELETE_DELAY_DAYS: parseInt(Bun.env.GDPR_DELETE_DELAY_DAYS || "30"),
   });
 }
 

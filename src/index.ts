@@ -3,7 +3,7 @@ import { deleteCookie } from "hono/cookie";
 import { server } from "@passwordless-id/webauthn";
 import * as nodemailer from "nodemailer";
 import dayjs from "dayjs";
-import DB from "./database";
+import DB, { User } from "./database";
 import * as cookie from "./cookie";
 import EmailTemplate from "./email_template";
 import { JWTPayload } from "hono/utils/jwt/types";
@@ -12,6 +12,10 @@ import { HTTPException } from "hono/http-exception";
 import { StatusCode } from "hono/utils/http-status";
 import config from "./config";
 import base64url from "base64-url";
+import { createMiddleware } from "hono/factory";
+import { userToJson } from "./utils";
+import Cron from "croner";
+import { rateLimiter } from "hono-rate-limiter";
 
 interface JwtPayloadWithEmail extends JWTPayload {
   email: string;
@@ -40,7 +44,20 @@ const cookie_secret = cookie.encodeSecret(config.COOKIE_SECRET);
 const cookie_expires_short = () => dayjs().add(1, "day");
 const cookie_expires_long = () => dayjs().add(1, "month");
 
+const limiterEmail = rateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
+  standardHeaders: "draft-6", // draft-6: `RateLimit-*` headers; draft-7: combined `RateLimit` header
+  keyGenerator: (c) => c.req.query("email") || "", // Method to generate custom identifiers for clients.
+  // store: ... , // Redis, MemoryStore, etc. See below.
+});
+
 const db = new DB(config.DATABASE_PATH!);
+
+Cron("@daily", () => {
+  console.info("Running daily cron");
+  db.userGdprDeleteEnact();
+}).trigger();
 
 const transporter = nodemailer.createTransport({
   host: config.SMTP_HOST,
@@ -67,8 +84,55 @@ const emailTemplate = await EmailTemplate(config.EMAIL_TEMPLATE_PATH);
 console.log(config);
 
 const app = new Hono()
+  .use(
+    "/auth/auth/*",
+    createMiddleware<{
+      Variables: {
+        auth: User;
+      };
+    }>(async (c, next) => {
+      try {
+        const payload = await cookie.jwtSignVerifyRead<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_AUTH, cookie_secret);
+
+        const user = db.userGetById(payload.user_id);
+        if (user.jwt_version !== payload.jwt_version)
+          throw new HTTPException(401, { message: "Force logout, re-authentication requested" });
+
+        await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
+          c,
+          COOKIE_AUTH,
+          cookie_expires_long(),
+          cookie_secret,
+          {
+            user_id: payload.user_id,
+            jwt_version: payload.jwt_version,
+          }
+        );
+
+        c.set("auth", user);
+        next();
+      } catch (err: any | Error | HTTPException) {
+        let status: StatusCode = 500;
+        let errMessage = "HTTP error: " + status;
+        if (err instanceof HTTPException) {
+          status = err.status;
+          if (err.status >= 500) throw err;
+          errMessage = err.message;
+        } else if (err instanceof Error) {
+          errMessage = err.message;
+        } else if (typeof err === "string") {
+          errMessage = err;
+        }
+
+        deleteCookie(c, COOKIE_AUTH);
+        const res = c.text(errMessage);
+        throw new HTTPException(status, { res });
+      }
+    })
+  )
+
   // register or login via email and new passkey
-  .get("/auth/register/email/challenge", async (c) => {
+  .get("/auth/register/email/challenge", limiterEmail, async (c) => {
     const email = c.req.query("email");
     if (!email) throw new HTTPException(400, { message: "Invalid email" });
 
@@ -207,7 +271,7 @@ const app = new Hono()
     const payload = await cookie
       .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_LOGIN_CHALLENGE, cookie_secret)
       .catch((err) => {
-        throw new HTTPException(400, { message: `Must be opened in the same browser, mac 30 min after email is sent` });
+        throw new HTTPException(400, { message: `Must be opened in the same browser, max 30 min after email is sent` });
       });
     const body = (await c.req.json()) as AuthenticationJSON;
 
@@ -230,38 +294,33 @@ const app = new Hono()
     return c.text("", 201);
   })
 
-  .post("/auth/auth/validate", async (c) => {
-    try {
-      const payload = await cookie.jwtSignVerifyRead<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_AUTH, cookie_secret);
-
-      const user = db.userGetById(payload.user_id);
-      if (user.jwt_version !== payload.jwt_version)
-        throw new HTTPException(401, { message: "Force logout, re-authentication requested" });
-
-      await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_AUTH, cookie_expires_long(), cookie_secret, {
-        user_id: payload.user_id,
-        jwt_version: payload.jwt_version,
-      });
-      return c.json({
-        user_id: user.id,
-        user_email: user.email,
-        user_created_at: user.created_at,
-      });
-    } catch (err: any | Error | HTTPException) {
-      let status: StatusCode = 500;
-      if (err instanceof HTTPException) {
-        status = err.status;
-        if (err.status >= 500) throw err;
-      }
-
-      deleteCookie(c, COOKIE_AUTH);
-      c.status(status);
-      return c.json({ message: err?.message || err });
-    }
-  })
   .get("/auth/logout", async (c) => {
     deleteCookie(c, COOKIE_AUTH);
     return c.text("", 201);
+  })
+
+  .get("/auth/auth/validate", async (c) => {
+    const user = c.get("auth");
+    return c.json(userToJson(user));
+  })
+
+  // GDPR
+  .get("/auth/auth/gdpr/data", async (c) => {
+    const user = c.get("auth");
+    const credentials = await db.credentialInfosByUserId(user.id);
+    return c.json({ user: userToJson(user), credentials });
+  })
+  .post("/auth/auth/gdpr/delete-set", async (c) => {
+    let user = c.get("auth");
+    db.userGdprDeleteSetDate(user.id, config.GDPR_DELETE_DELAY_DAYS);
+    user = db.userGetById(user.id);
+    return c.json(userToJson(user));
+  })
+  .post("/auth/auth/gdpr/delete-unset", async (c) => {
+    let user = c.get("auth");
+    db.userGdprDeleteUnset(user.id);
+    user = db.userGetById(user.id);
+    return c.json(userToJson(user));
   })
 
   .get("/auth", async (c) => {
