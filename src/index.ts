@@ -36,11 +36,14 @@ interface JwtPayloadWithUserIdJwtVersion extends JWTPayload {
 const COOKIE_VALID_USER_REGISTER_PASSKEY = "swa_valid_user_register_passkey";
 const COOKIE_VALID_USER_WITHOUT_PASSKEY = "swa_valid_user_without_passkey";
 const COOKIE_LOGIN_CHALLENGE = "swa_login_challenge";
+const COOKIE_DOUBLECHECK_CHALLENGE = "swa_doublecheck_challenge";
 const COOKIE_EMAIL_CHALLENGE = "swa_email_challenge";
 const COOKIE_AUTH = "swa_auth";
+const COOKIE_DOUBLECHECK_AUTH = "swa_doublecheck_auth";
 
 const cookie_secret = cookie.encodeSecret(config.COOKIE_SECRET);
 
+const cookie_expires_shorter = () => dayjs().add(1, "minute");
 const cookie_expires_short = () => dayjs().add(1, "day");
 const cookie_expires_long = () => dayjs().add(1, "month");
 
@@ -110,7 +113,7 @@ const app = new Hono()
         );
 
         c.set("auth", user);
-        next();
+        await next();
       } catch (err: any | Error | HTTPException) {
         let status: StatusCode = 500;
         let errMessage = "HTTP error: " + status;
@@ -162,7 +165,7 @@ const app = new Hono()
     return c.text("", 201);
   })
 
-  .get("/auth/register/email/validate", async (c) => {
+  .get("/auth/register/email/verify", async (c) => {
     const queryChallengeBase64 = c.req.query("c");
     if (!queryChallengeBase64) throw new HTTPException(401, { message: "Invalid url" });
     const queryChallenge = base64url.decode(queryChallengeBase64);
@@ -216,7 +219,7 @@ const app = new Hono()
     return c.json({ challenge, email: payload.email });
   })
 
-  .post("/auth/register/passkey/validate", async (c) => {
+  .post("/auth/register/passkey/verify", async (c) => {
     const payload = await cookie.jwtDecryptRead<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_VALID_USER_REGISTER_PASSKEY,
@@ -229,7 +232,7 @@ const app = new Hono()
     });
     const user = await db.userGetByEmail(payload.email);
     if (body.user.name !== user.email)
-      throw new HTTPException(400, { message: "Attempted to validate with a different email" });
+      throw new HTTPException(400, { message: "Attempted to verify with a different email" });
 
     db.credentialAdd(user.id, registrationParsed.authenticator.name, registrationParsed.credential);
 
@@ -267,7 +270,7 @@ const app = new Hono()
     });
   })
 
-  .post("/auth/login/validate", async (c) => {
+  .post("/auth/login/verify", async (c) => {
     const payload = await cookie
       .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_LOGIN_CHALLENGE, cookie_secret)
       .catch((err) => {
@@ -304,19 +307,90 @@ const app = new Hono()
     return c.json(userToJson(user));
   })
 
+  .get("/auth/auth/doublecheck/challenge", async (c) => {
+    const user = c.get("auth");
+    const challenge = server.randomChallenge();
+
+    const credentials = await db.credentialInfosByUserId(user.id);
+
+    await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
+      c,
+      COOKIE_DOUBLECHECK_CHALLENGE,
+      cookie_expires_shorter(),
+      cookie_secret,
+      {
+        challenge,
+        email: user.email,
+      }
+    );
+
+    return c.json({
+      challenge,
+      credentials,
+    });
+  })
+  .post("/auth/auth/doublecheck/verify", async (c) => {
+    const user = c.get("auth");
+    const payload = await cookie
+      .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_DOUBLECHECK_CHALLENGE, cookie_secret)
+      .catch((err) => {
+        throw new HTTPException(400, { message: `Must be opened in the same browser, max 30 min after email is sent` });
+      });
+    if (user.email !== payload.email)
+      throw new HTTPException(400, { message: "Access denied: Email is not the same as the current user" });
+    const body = (await c.req.json()) as AuthenticationJSON;
+    const credentialKey = db.credentialByIdAndUserId(user.id, body.id);
+
+    await server.verifyAuthentication(body, credentialKey.credential_json, {
+      challenge: payload.challenge,
+      origin: config.WEBAUTHN_ORIGIN,
+      userVerified: true,
+    });
+
+    await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
+      c,
+      COOKIE_DOUBLECHECK_AUTH,
+      cookie_expires_shorter(),
+      cookie_secret,
+      {
+        user_id: user.id,
+        jwt_version: user.jwt_version,
+      }
+    );
+    deleteCookie(c, COOKIE_DOUBLECHECK_CHALLENGE);
+    return c.text("", 201);
+  })
+  .get("/auth/auth/doublecheck/validate", async (c) => {
+    try {
+      const user = c.get("auth");
+      const payload = await cookie.jwtSignVerifyRead<JwtPayloadWithUserIdJwtVersion>(
+        c,
+        COOKIE_DOUBLECHECK_AUTH,
+        cookie_secret
+      );
+      if (payload.user_id !== user.id) throw "Invalid double check cookie user id";
+      if (payload.jwt_version !== user.jwt_version) throw "Invalid double check cookie jwt version";
+
+      return c.json(userToJson(user));
+    } catch (err) {
+      deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
+      return c.text("Double authentication check failed", 400);
+    }
+  })
+
   // GDPR
-  .get("/auth/auth/gdpr/data", async (c) => {
+  .get("/auth/auth/doublecheck/gdpr/data", async (c) => {
     const user = c.get("auth");
     const credentials = await db.credentialInfosByUserId(user.id);
     return c.json({ user: userToJson(user), credentials });
   })
-  .post("/auth/auth/gdpr/delete-set", async (c) => {
+  .post("/auth/auth/doublecheck/gdpr/delete-set", async (c) => {
     let user = c.get("auth");
     db.userGdprDeleteSetDate(user.id, config.GDPR_DELETE_DELAY_DAYS);
     user = db.userGetById(user.id);
     return c.json(userToJson(user));
   })
-  .post("/auth/auth/gdpr/delete-unset", async (c) => {
+  .post("/auth/auth/doublecheck/gdpr/delete-unset", async (c) => {
     let user = c.get("auth");
     db.userGdprDeleteUnset(user.id);
     user = db.userGetById(user.id);

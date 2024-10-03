@@ -4,6 +4,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import * as jose from "jose";
 import { CookieOptions } from "hono/utils/cookie";
 import { JWTPayload } from "hono/utils/jwt/types";
+import { HTTPException } from "hono/http-exception";
 
 // Constants
 // ----------------------------------------------------------------
@@ -48,10 +49,14 @@ export async function jwtSignCreate<P extends jose.JWTPayload>(
 
 // Read signed cookie, data is stored in unencrypted but verifiable with a signature
 export async function jwtSignVerifyRead<P extends JWTPayload>(c: Context, key: string, secret: Uint8Array): Promise<P> {
-  const token = getCookie(c, key);
-  if (!token) throw "Missing request cookie: " + key;
-  const result = await jose.jwtVerify<P>(token, secret);
-  return result.payload;
+  try {
+    const token = getCookie(c, key);
+    if (!token) throw "Missing request cookie: " + key;
+    const result = await jose.jwtVerify<P>(token, secret);
+    return result.payload;
+  } catch (e) {
+    throw new HTTPException(401, { message: e!.toString() });
+  }
 }
 
 // Create an encrypted cookie, data is stored in encrypted
@@ -80,8 +85,12 @@ export async function jwtDecryptRead<P extends jose.JWTPayload>(
   key: string,
   secret: Uint8Array
 ): Promise<P> {
-  const token = getCookie(c, key);
-  if (!token) throw "Missing request cookie: " + key;
-  const result = await jose.jwtDecrypt<P>(token, secret);
-  return result.payload;
+  try {
+    const token = getCookie(c, key);
+    if (!token) throw "Missing request cookie: " + key;
+    const result = await jose.jwtDecrypt<P>(token, secret);
+    return result.payload;
+  } catch (e) {
+    throw new HTTPException(401, { message: e!.toString() });
+  }
 }
