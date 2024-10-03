@@ -12,7 +12,7 @@ const defaultOptions: CookieOptions = {
   domain: Bun.env.COOKIE_DOMAIN,
   httpOnly: true,
   secure: Bun.env.COOKIE_SECURE !== "false",
-  sameSite: "strict",
+  sameSite: Bun.env.COOKIE_SAMESITE as CookieOptions["sameSite"],
 };
 
 // Utilities
