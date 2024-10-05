@@ -42,11 +42,13 @@ const COOKIE_AUTH = "swa_auth";
 const COOKIE_DOUBLECHECK_AUTH = "swa_doublecheck_auth";
 const COOKIE_CSRF = "swa_csrf";
 
-const cookie_secret = cookie.encodeSecret(config.COOKIE_SECRET);
+const cookie_expires_auth = () => dayjs().add(1, "month").toDate();
+const cookie_expires_csrf = () => dayjs().add(15, "seconds").toDate();
+const cookie_expires_passkey_challenge = () => dayjs().add(2, "minutes").toDate();
+const cookie_expires_email_challenge = () => dayjs().add(2, "hours").toDate();
+const cookie_expires_email_to_passkey = () => dayjs().add(1, "hour").toDate();
 
-const cookie_expires_shorter = () => dayjs().add(1, "minute");
-const cookie_expires_short = () => dayjs().add(1, "day");
-const cookie_expires_long = () => dayjs().add(1, "month");
+const cookie_secret = cookie.encodeSecret(config.COOKIE_SECRET);
 
 const limiterEmail = rateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -105,7 +107,7 @@ const app = new Hono()
         await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
           c,
           COOKIE_AUTH,
-          cookie_expires_long(),
+          cookie_expires_auth(),
           cookie_secret,
           {
             user_id: payload.user_id,
@@ -157,7 +159,7 @@ const app = new Hono()
     await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_EMAIL_CHALLENGE,
-      cookie_expires_short(),
+      cookie_expires_email_challenge(),
       cookie_secret,
       {
         challenge: challenge,
@@ -191,7 +193,7 @@ const app = new Hono()
     await cookie.jwtSignCreate<JwtPayloadWithEmail>(
       c,
       COOKIE_VALID_USER_WITHOUT_PASSKEY,
-      cookie_expires_short(),
+      cookie_expires_email_to_passkey(),
       cookie_secret,
       {
         email: payload.email,
@@ -213,7 +215,7 @@ const app = new Hono()
     await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_VALID_USER_REGISTER_PASSKEY,
-      cookie_expires_short(),
+      cookie_expires_passkey_challenge(),
       cookie_secret,
       {
         challenge,
@@ -244,7 +246,7 @@ const app = new Hono()
     await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
       c,
       COOKIE_AUTH,
-      cookie_expires_long(),
+      cookie_expires_auth(),
       cookie_secret,
       {
         user_id: user.id,
@@ -268,7 +270,7 @@ const app = new Hono()
     await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_LOGIN_CHALLENGE,
-      cookie_expires_short(),
+      cookie_expires_passkey_challenge(),
       cookie_secret,
       {
         challenge,
@@ -305,7 +307,7 @@ const app = new Hono()
     await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
       c,
       COOKIE_AUTH,
-      cookie_expires_long(),
+      cookie_expires_auth(),
       cookie_secret,
       {
         user_id: user.id,
@@ -331,7 +333,7 @@ const app = new Hono()
     await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
       c,
       COOKIE_CSRF,
-      cookie_expires_shorter(),
+      cookie_expires_csrf(),
       cookie_secret,
       {
         user_id: user.id,
@@ -361,7 +363,7 @@ const app = new Hono()
     await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
       c,
       COOKIE_DOUBLECHECK_CHALLENGE,
-      cookie_expires_shorter(),
+      cookie_expires_passkey_challenge(),
       cookie_secret,
       {
         challenge,
@@ -396,7 +398,7 @@ const app = new Hono()
     await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
       c,
       COOKIE_DOUBLECHECK_AUTH,
-      cookie_expires_shorter(),
+      cookie_expires_csrf(),
       cookie_secret,
       {
         user_id: user.id,

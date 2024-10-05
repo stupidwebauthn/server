@@ -33,18 +33,18 @@ export function encodeSecret(secret: string): Uint8Array {
 export async function jwtSignCreate<P extends jose.JWTPayload>(
   c: Context,
   key: string,
-  expires: Dayjs,
+  expires: Date,
   secret: Uint8Array,
   payload: P,
   sameSite: SameSite
 ): Promise<void> {
   const token = await new jose.SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime(expires.toDate())
+    .setExpirationTime(expires)
     .sign(secret);
 
   setCookie(c, key, token, {
-    expires: expires.toDate(),
+    expires: expires,
     sameSite,
     ...defaultOptions,
   });
@@ -66,7 +66,7 @@ export async function jwtSignVerifyRead<P extends JWTPayload>(c: Context, key: s
 export async function jwtEncryptCreate<P extends jose.JWTPayload>(
   c: Context,
   key: string,
-  expires: Dayjs,
+  expires: Date,
   secret: Uint8Array,
   payload: P,
   sameSite: SameSite
@@ -74,11 +74,11 @@ export async function jwtEncryptCreate<P extends jose.JWTPayload>(
   const token = await new jose.EncryptJWT(payload)
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
     .setIssuedAt()
-    .setExpirationTime(expires.toDate())
+    .setExpirationTime(expires)
     .encrypt(secret);
 
   setCookie(c, key, token, {
-    expires: expires.toDate(),
+    expires: expires,
     sameSite,
     ...defaultOptions,
   });
