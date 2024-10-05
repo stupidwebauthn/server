@@ -40,6 +40,7 @@ const COOKIE_DOUBLECHECK_CHALLENGE = "swa_doublecheck_challenge";
 const COOKIE_EMAIL_CHALLENGE = "swa_email_challenge";
 const COOKIE_AUTH = "swa_auth";
 const COOKIE_DOUBLECHECK_AUTH = "swa_doublecheck_auth";
+const COOKIE_CSRF = "swa_csrf";
 
 const cookie_secret = cookie.encodeSecret(config.COOKIE_SECRET);
 
@@ -109,7 +110,8 @@ const app = new Hono()
           {
             user_id: payload.user_id,
             jwt_version: payload.jwt_version,
-          }
+          },
+          "Lax"
         );
 
         c.set("auth", user);
@@ -160,7 +162,8 @@ const app = new Hono()
       {
         challenge: challenge,
         email: email,
-      }
+      },
+      "Lax"
     );
     return c.text("", 201);
   })
@@ -192,7 +195,8 @@ const app = new Hono()
       cookie_secret,
       {
         email: payload.email,
-      }
+      },
+      "Strict"
     );
     return c.text("", 201);
   })
@@ -214,7 +218,8 @@ const app = new Hono()
       {
         challenge,
         email: payload.email,
-      }
+      },
+      "Strict"
     );
     return c.json({ challenge, email: payload.email });
   })
@@ -236,10 +241,17 @@ const app = new Hono()
 
     db.credentialAdd(user.id, registrationParsed.authenticator.name, registrationParsed.credential);
 
-    await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_AUTH, cookie_expires_long(), cookie_secret, {
-      user_id: user.id,
-      jwt_version: user.jwt_version,
-    });
+    await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
+      c,
+      COOKIE_AUTH,
+      cookie_expires_long(),
+      cookie_secret,
+      {
+        user_id: user.id,
+        jwt_version: user.jwt_version,
+      },
+      "Lax"
+    );
     deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
     deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
     return c.text("", 201);
@@ -261,7 +273,8 @@ const app = new Hono()
       {
         challenge,
         email: user.email,
-      }
+      },
+      "Strict"
     );
 
     return c.json({
@@ -289,10 +302,17 @@ const app = new Hono()
 
     db.credentialUsedNow(credentialKey.id);
 
-    await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_AUTH, cookie_expires_long(), cookie_secret, {
-      user_id: user.id,
-      jwt_version: user.jwt_version,
-    });
+    await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
+      c,
+      COOKIE_AUTH,
+      cookie_expires_long(),
+      cookie_secret,
+      {
+        user_id: user.id,
+        jwt_version: user.jwt_version,
+      },
+      "Lax"
+    );
     deleteCookie(c, COOKIE_LOGIN_CHALLENGE);
     return c.text("", 201);
   })
@@ -305,6 +325,31 @@ const app = new Hono()
   .get("/auth/auth/validate", async (c) => {
     const user = c.get("auth");
     return c.json(userToJson(user));
+  })
+  .get("/auth/auth/csrf/challenge", async (c) => {
+    const user = c.get("auth");
+    await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
+      c,
+      COOKIE_CSRF,
+      cookie_expires_shorter(),
+      cookie_secret,
+      {
+        user_id: user.id,
+        jwt_version: user.jwt_version,
+      },
+      "Strict"
+    );
+    return c.text("", 201);
+  })
+  .get("/auth/auth/csrf/validate", async (c) => {
+    try {
+      const user = c.get("auth");
+      await cookie.jwtSignVerifyRead<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_CSRF, cookie_secret);
+      return c.json(userToJson(user));
+    } catch (err) {
+      deleteCookie(c, COOKIE_CSRF);
+      return c.text("Csrf check failed", 400);
+    }
   })
 
   .get("/auth/auth/doublecheck/challenge", async (c) => {
@@ -321,7 +366,8 @@ const app = new Hono()
       {
         challenge,
         email: user.email,
-      }
+      },
+      "Strict"
     );
 
     return c.json({
@@ -355,7 +401,8 @@ const app = new Hono()
       {
         user_id: user.id,
         jwt_version: user.jwt_version,
-      }
+      },
+      "Lax"
     );
     deleteCookie(c, COOKIE_DOUBLECHECK_CHALLENGE);
     return c.text("", 201);
@@ -401,7 +448,10 @@ const app = new Hono()
     return c.text("Hello World!");
   })
   .get("/", async (c) => {
-    return c.text("Hello World!");
+    c.header("");
+    return c.text(
+      "Welcome to Stupid Webauthn!, Generally you shouldn't be seeing this, the webmaster should be proxying /auth/ to http://stupidwebauthn/auth/"
+    );
   });
 
 export default app;

@@ -6,6 +6,8 @@ import { CookieOptions } from "hono/utils/cookie";
 import { JWTPayload } from "hono/utils/jwt/types";
 import { HTTPException } from "hono/http-exception";
 
+export type SameSite = "lax" | "strict" | "Lax" | "Strict";
+
 // Constants
 // ----------------------------------------------------------------
 
@@ -13,7 +15,6 @@ const defaultOptions: CookieOptions = {
   domain: Bun.env.COOKIE_DOMAIN,
   httpOnly: true,
   secure: Bun.env.COOKIE_SECURE !== "false",
-  sameSite: Bun.env.COOKIE_SAMESITE as CookieOptions["sameSite"],
 };
 
 // Utilities
@@ -34,7 +35,8 @@ export async function jwtSignCreate<P extends jose.JWTPayload>(
   key: string,
   expires: Dayjs,
   secret: Uint8Array,
-  payload: P
+  payload: P,
+  sameSite: SameSite
 ): Promise<void> {
   const token = await new jose.SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -43,6 +45,7 @@ export async function jwtSignCreate<P extends jose.JWTPayload>(
 
   setCookie(c, key, token, {
     expires: expires.toDate(),
+    sameSite,
     ...defaultOptions,
   });
 }
@@ -65,7 +68,8 @@ export async function jwtEncryptCreate<P extends jose.JWTPayload>(
   key: string,
   expires: Dayjs,
   secret: Uint8Array,
-  payload: P
+  payload: P,
+  sameSite: SameSite
 ): Promise<void> {
   const token = await new jose.EncryptJWT(payload)
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
@@ -75,6 +79,7 @@ export async function jwtEncryptCreate<P extends jose.JWTPayload>(
 
   setCookie(c, key, token, {
     expires: expires.toDate(),
+    sameSite,
     ...defaultOptions,
   });
 }
