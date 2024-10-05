@@ -86,6 +86,9 @@ export default class DB {
     credential.credential_json = JSON.parse(credential.credential_data);
     return credential;
   }
+  credentialDeleteById(id: number) {
+    this.db.exec(`DELETE FROM credentials WHERE id = ?`, [id]);
+  }
   credentialAdd(user_id: number, name: string, credentialInfo: CredentialInfo): void {
     const credential_id = credentialInfo.id;
     const credential_data = JSON.stringify(credentialInfo);

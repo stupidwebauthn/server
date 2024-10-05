@@ -382,7 +382,7 @@ const app = new Hono()
     const payload = await cookie
       .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_DOUBLECHECK_CHALLENGE, cookie_secret)
       .catch((err) => {
-        throw new HTTPException(400, { message: `Must be opened in the same browser, max 30 min after email is sent` });
+        throw new HTTPException(400, { message: `You were too slow at using your passkey, please try again` });
       });
     if (user.email !== payload.email)
       throw new HTTPException(400, { message: "Access denied: Email is not the same as the current user" });
@@ -425,6 +425,36 @@ const app = new Hono()
       deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
       return c.text("Double authentication check failed", 400);
     }
+  })
+  .delete("/auth/auth/doublecheck/verify", async (c) => {
+    const user = c.get("auth");
+    const payload = await cookie
+      .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_DOUBLECHECK_CHALLENGE, cookie_secret)
+      .catch((err) => {
+        throw new HTTPException(400, { message: `You were too slow at using your passkey, please try again` });
+      });
+    if (user.email !== payload.email)
+      throw new HTTPException(400, { message: "Access denied: Email is not the same as the current user" });
+    const body = (await c.req.json()) as AuthenticationJSON;
+    const credentialKey = db.credentialByIdAndUserId(user.id, body.id);
+
+    await server.verifyAuthentication(body, credentialKey.credential_json, {
+      challenge: payload.challenge,
+      origin: config.WEBAUTHN_ORIGIN,
+      userVerified: true,
+    });
+
+    db.credentialDeleteById(credentialKey.id);
+
+    deleteCookie(c, COOKIE_AUTH);
+    deleteCookie(c, COOKIE_CSRF);
+    deleteCookie(c, COOKIE_DOUBLECHECK_CHALLENGE);
+    deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
+    deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
+    deleteCookie(c, COOKIE_LOGIN_CHALLENGE);
+    deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
+    deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
+    return c.text("", 201);
   })
   .put("/auth/auth/doublecheck/panic", async (c) => {
     try {
