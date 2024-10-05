@@ -65,6 +65,10 @@ export default class DB {
     this.db.exec(`DELETE FROM credentials WHERE user_id IN (?)`, userIds);
     this.db.exec(`DELETE FROM users WHERE id IN (?)`, userIds);
   }
+  userPanic(userId: number) {
+    this.db.exec(`UPDATE users SET jwt_version = jwt_version + 1 WHERE id = ?`, [userId]);
+    this.db.exec(`DELETE FROM credentials WHERE user_id = ?`, [userId]);
+  }
   credentialInfosByUserId(userId: number): CredentialInfo[] {
     const list = this.db
       .query("SELECT id, credential_data FROM credentials WHERE user_id = ?")

@@ -424,6 +424,32 @@ const app = new Hono()
       return c.text("Double authentication check failed", 400);
     }
   })
+  .put("/auth/auth/doublecheck/panic", async (c) => {
+    try {
+      const user = c.get("auth");
+      const payload = await cookie.jwtSignVerifyRead<JwtPayloadWithUserIdJwtVersion>(
+        c,
+        COOKIE_DOUBLECHECK_AUTH,
+        cookie_secret
+      );
+      if (payload.user_id !== user.id) throw "Invalid double check cookie user id";
+      if (payload.jwt_version !== user.jwt_version) throw "Invalid double check cookie jwt version";
+
+      db.userPanic(user.id);
+      deleteCookie(c, COOKIE_AUTH);
+      deleteCookie(c, COOKIE_CSRF);
+      deleteCookie(c, COOKIE_DOUBLECHECK_CHALLENGE);
+      deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
+      deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
+      deleteCookie(c, COOKIE_LOGIN_CHALLENGE);
+      deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
+      deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
+      return c.text("", 201);
+    } catch (err) {
+      deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
+      return c.text("Double authentication check failed", 400);
+    }
+  })
 
   // GDPR
   .get("/auth/auth/doublecheck/gdpr/data", async (c) => {
