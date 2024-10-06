@@ -1,12 +1,25 @@
-import { Dayjs } from "dayjs";
 import { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import * as jose from "jose";
 import { CookieOptions } from "hono/utils/cookie";
-import { JWTPayload } from "hono/utils/jwt/types";
 import { HTTPException } from "hono/http-exception";
 
 export type SameSite = "lax" | "strict" | "Lax" | "Strict";
+
+export type JWTPayload = {
+  /**
+   * The token is checked to ensure it has not expired.
+   */
+  exp?: number;
+  /**
+   * The token is checked to ensure it is not being used before a specified time.
+   */
+  nbf?: number;
+  /**
+   * The token is checked to ensure it is not issued in the future.
+   */
+  iat?: number;
+};
 
 // Constants
 // ----------------------------------------------------------------
@@ -30,7 +43,7 @@ export function encodeSecret(secret: string): Uint8Array {
 // ----------------------------------------------------------------
 
 // Create signed cookie, data is stored in unencrypted but verifiable with a signature
-export async function jwtSignCreate<P extends jose.JWTPayload>(
+export async function jwtSignCreate<P extends JWTPayload>(
   c: Context,
   key: string,
   expires: Date,
@@ -63,7 +76,7 @@ export async function jwtSignVerifyRead<P extends JWTPayload>(c: Context, key: s
 }
 
 // Create an encrypted cookie, data is stored in encrypted
-export async function jwtEncryptCreate<P extends jose.JWTPayload>(
+export async function jwtEncryptCreate<P extends JWTPayload>(
   c: Context,
   key: string,
   expires: Date,
@@ -85,11 +98,7 @@ export async function jwtEncryptCreate<P extends jose.JWTPayload>(
 }
 
 // Read an encrypted cookie, data is stored in encrypted
-export async function jwtDecryptRead<P extends jose.JWTPayload>(
-  c: Context,
-  key: string,
-  secret: Uint8Array
-): Promise<P> {
+export async function jwtDecryptRead<P extends JWTPayload>(c: Context, key: string, secret: Uint8Array): Promise<P> {
   try {
     const token = getCookie(c, key);
     if (!token) throw "Missing request cookie: " + key;

@@ -5,8 +5,8 @@ import * as nodemailer from "nodemailer";
 import dayjs from "dayjs";
 import DB, { User } from "./database";
 import * as cookie from "./cookie";
+import type { JWTPayload } from "./cookie";
 import EmailTemplate from "./email_template";
-import { JWTPayload } from "hono/utils/jwt/types";
 import { AuthenticationJSON, RegistrationJSON } from "@passwordless-id/webauthn/dist/esm/types";
 import { HTTPException } from "hono/http-exception";
 import { StatusCode } from "hono/utils/http-status";
@@ -24,13 +24,13 @@ interface JwtPayloadWithEmailChallenge extends JWTPayload {
   challenge: string;
   email: string;
 }
-interface JwtPayloadWithEmailChallenge extends JWTPayload {
-  email: string;
-  challenge: string;
-}
 interface JwtPayloadWithUserIdJwtVersion extends JWTPayload {
   user_id: number;
   jwt_version: number;
+}
+interface JwtPayloadWithUserIdChallenge extends JWTPayload {
+  challenge: string;
+  user_id: number;
 }
 
 const COOKIE_VALID_USER_REGISTER_PASSKEY = "swa_valid_user_register_passkey";
@@ -360,14 +360,14 @@ const app = new Hono()
 
     const credentials = await db.credentialInfosByUserId(user.id);
 
-    await cookie.jwtEncryptCreate<JwtPayloadWithEmailChallenge>(
+    await cookie.jwtEncryptCreate<JwtPayloadWithUserIdChallenge>(
       c,
       COOKIE_DOUBLECHECK_CHALLENGE,
       cookie_expires_passkey_challenge(),
       cookie_secret,
       {
         challenge,
-        email: user.email,
+        user_id: user.id,
       },
       "Strict"
     );
@@ -380,11 +380,11 @@ const app = new Hono()
   .post("/auth/auth/doublecheck/verify", async (c) => {
     const user = c.get("auth");
     const payload = await cookie
-      .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_DOUBLECHECK_CHALLENGE, cookie_secret)
+      .jwtDecryptRead<JwtPayloadWithUserIdChallenge>(c, COOKIE_DOUBLECHECK_CHALLENGE, cookie_secret)
       .catch((err) => {
         throw new HTTPException(400, { message: `You were too slow at using your passkey, please try again` });
       });
-    if (user.email !== payload.email)
+    if (user.id !== payload.user_id)
       throw new HTTPException(400, { message: "Access denied: Email is not the same as the current user" });
     const body = (await c.req.json()) as AuthenticationJSON;
     const credentialKey = db.credentialByIdAndUserId(user.id, body.id);
@@ -429,12 +429,12 @@ const app = new Hono()
   .delete("/auth/auth/doublecheck/verify", async (c) => {
     const user = c.get("auth");
     const payload = await cookie
-      .jwtDecryptRead<JwtPayloadWithEmailChallenge>(c, COOKIE_DOUBLECHECK_CHALLENGE, cookie_secret)
-      .catch((err) => {
+      .jwtDecryptRead<JwtPayloadWithUserIdChallenge>(c, COOKIE_DOUBLECHECK_CHALLENGE, cookie_secret)
+      .catch(() => {
         throw new HTTPException(400, { message: `You were too slow at using your passkey, please try again` });
       });
-    if (user.email !== payload.email)
-      throw new HTTPException(400, { message: "Access denied: Email is not the same as the current user" });
+    if (user.id !== payload.user_id)
+      throw new HTTPException(400, { message: "Access denied: Cookie's user is not the same as the current user" });
     const body = (await c.req.json()) as AuthenticationJSON;
     const credentialKey = db.credentialByIdAndUserId(user.id, body.id);
 
