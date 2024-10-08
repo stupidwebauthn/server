@@ -43,6 +43,7 @@ const COOKIE_DOUBLECHECK_AUTH = "swa_doublecheck_auth";
 const COOKIE_CSRF = "swa_csrf";
 
 const cookie_expires_auth = () => dayjs().add(1, "month").toDate();
+const cookie_expires_auth_nopasskey = () => dayjs().add(1, "day").toDate();
 const cookie_expires_csrf = () => dayjs().add(15, "seconds").toDate();
 const cookie_expires_passkey_challenge = () => dayjs().add(2, "minutes").toDate();
 const cookie_expires_email_challenge = () => dayjs().add(2, "hours").toDate();
@@ -199,6 +200,30 @@ const app = new Hono()
         email: payload.email,
       },
       "Strict"
+    );
+    return c.text("", 201);
+  })
+
+  .post("/auth/register/email/no-passkey-login", async (c) => {
+    const payload = await cookie.jwtSignVerifyRead<JwtPayloadWithEmail>(
+      c,
+      COOKIE_VALID_USER_WITHOUT_PASSKEY,
+      cookie_secret
+    );
+    if (!payload.email) throw new HTTPException(401, { message: "Invalid email" });
+
+    const user = db.userCreateOrFail(payload.email);
+
+    await cookie.jwtSignCreate<JwtPayloadWithUserIdJwtVersion>(
+      c,
+      COOKIE_AUTH,
+      cookie_expires_auth_nopasskey(),
+      cookie_secret,
+      {
+        user_id: user.id,
+        jwt_version: user.jwt_version,
+      },
+      "Lax"
     );
     return c.text("", 201);
   })

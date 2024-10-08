@@ -28,16 +28,12 @@ export default class DB {
     this.db = db;
   }
 
-  userCreateOrFail(email: string): number {
+  userCreateOrFail(email: string): User {
     this.db.exec(`INSERT OR IGNORE INTO users (email) values (?)`, [email]);
-    const id = (
-      this.db.query("SELECT id FROM users WHERE email = ?").get(email) as {
-        id: number;
-      } | null
-    )?.id;
-    if (!id) throw "User not found";
+    const user = this.db.query("SELECT * FROM users WHERE email = ? LIMIT 1").get(email) as User | null;
+    if (!user) throw "User not found";
 
-    return id;
+    return user;
   }
   userGetById(id: number): User {
     const user = this.db.query("SELECT * FROM users WHERE id = ? LIMIT 1").get(id) as null | User;
