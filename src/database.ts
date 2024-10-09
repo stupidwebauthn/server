@@ -116,6 +116,19 @@ function migrations(db: Database) {
     db.exec(`ALTER TABLE users ADD COLUMN gdpr_delete_at TEXT`);
     version = incrementDatabaseVersion(db, version);
   }
+  if (version === 2) {
+    db.exec(`CREATE TABLE IF NOT EXISTS credentials
+      (
+        id              INTEGER PRIMARY KEY,
+        user_id         INTEGER NOT NULL,
+        name            TEXT NOT NULL,
+        credential_id   TEXT NOT NULL,
+        credential_data TEXT NOT NULL,
+        used_at         TEXT NOT NULL DEFAULT (datetime()),
+        created_at      TEXT NOT NULL DEFAULT (datetime())
+      )`);
+    version = incrementDatabaseVersion(db, version);
+  }
 }
 
 // Thanks to: https://github.com/patlux
