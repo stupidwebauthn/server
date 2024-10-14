@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { deleteCookie } from "hono/cookie";
 import { server } from "@passwordless-id/webauthn";
 import * as nodemailer from "nodemailer";
 import dayjs from "dayjs";
@@ -132,7 +131,7 @@ const app = new Hono()
           errMessage = err;
         }
 
-        deleteCookie(c, COOKIE_AUTH);
+        cookie.deleteNow(c, COOKIE_AUTH);
         const res = c.text(errMessage);
         throw new HTTPException(status, { res });
       }
@@ -189,7 +188,7 @@ const app = new Hono()
 
     db.userCreateOrFail(payload.email);
 
-    deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
+    cookie.deleteNow(c, COOKIE_EMAIL_CHALLENGE);
 
     await cookie.jwtSignCreate<JwtPayloadWithEmail>(
       c,
@@ -279,8 +278,8 @@ const app = new Hono()
       },
       "Lax"
     );
-    deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
-    deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
+    cookie.deleteNow(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
+    cookie.deleteNow(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
     return c.text("", 201);
   })
 
@@ -340,12 +339,12 @@ const app = new Hono()
       },
       "Lax"
     );
-    deleteCookie(c, COOKIE_LOGIN_CHALLENGE);
+    cookie.deleteNow(c, COOKIE_LOGIN_CHALLENGE);
     return c.text("", 201);
   })
 
   .get("/auth/logout", async (c) => {
-    deleteCookie(c, COOKIE_AUTH);
+    cookie.deleteNow(c, COOKIE_AUTH);
     return c.text("", 201);
   })
 
@@ -374,7 +373,7 @@ const app = new Hono()
       await cookie.jwtSignVerifyRead<JwtPayloadWithUserIdJwtVersion>(c, COOKIE_CSRF, cookie_secret);
       return c.json(userToJson(user));
     } catch (err) {
-      deleteCookie(c, COOKIE_CSRF);
+      cookie.deleteNow(c, COOKIE_CSRF);
       return c.text("Csrf check failed", 400);
     }
   })
@@ -431,7 +430,7 @@ const app = new Hono()
       },
       "Lax"
     );
-    deleteCookie(c, COOKIE_DOUBLECHECK_CHALLENGE);
+    cookie.deleteNow(c, COOKIE_DOUBLECHECK_CHALLENGE);
     return c.text("", 201);
   })
   .get("/auth/auth/doublecheck/validate", async (c) => {
@@ -447,7 +446,7 @@ const app = new Hono()
 
       return c.json(userToJson(user));
     } catch (err) {
-      deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
+      cookie.deleteNow(c, COOKIE_DOUBLECHECK_AUTH);
       return c.text("Double authentication check failed", 400);
     }
   })
@@ -471,14 +470,14 @@ const app = new Hono()
 
     db.credentialDeleteById(credentialKey.id);
 
-    deleteCookie(c, COOKIE_AUTH);
-    deleteCookie(c, COOKIE_CSRF);
-    deleteCookie(c, COOKIE_DOUBLECHECK_CHALLENGE);
-    deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
-    deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
-    deleteCookie(c, COOKIE_LOGIN_CHALLENGE);
-    deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
-    deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
+    cookie.deleteNow(c, COOKIE_AUTH);
+    cookie.deleteNow(c, COOKIE_CSRF);
+    cookie.deleteNow(c, COOKIE_DOUBLECHECK_CHALLENGE);
+    cookie.deleteNow(c, COOKIE_DOUBLECHECK_AUTH);
+    cookie.deleteNow(c, COOKIE_EMAIL_CHALLENGE);
+    cookie.deleteNow(c, COOKIE_LOGIN_CHALLENGE);
+    cookie.deleteNow(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
+    cookie.deleteNow(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
     return c.text("", 201);
   })
   .put("/auth/auth/doublecheck/panic", async (c) => {
@@ -493,17 +492,17 @@ const app = new Hono()
       if (payload.jwt_version !== user.jwt_version) throw "Invalid double check cookie jwt version";
 
       db.userPanic(user.id);
-      deleteCookie(c, COOKIE_AUTH);
-      deleteCookie(c, COOKIE_CSRF);
-      deleteCookie(c, COOKIE_DOUBLECHECK_CHALLENGE);
-      deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
-      deleteCookie(c, COOKIE_EMAIL_CHALLENGE);
-      deleteCookie(c, COOKIE_LOGIN_CHALLENGE);
-      deleteCookie(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
-      deleteCookie(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
+      cookie.deleteNow(c, COOKIE_AUTH);
+      cookie.deleteNow(c, COOKIE_CSRF);
+      cookie.deleteNow(c, COOKIE_DOUBLECHECK_CHALLENGE);
+      cookie.deleteNow(c, COOKIE_DOUBLECHECK_AUTH);
+      cookie.deleteNow(c, COOKIE_EMAIL_CHALLENGE);
+      cookie.deleteNow(c, COOKIE_LOGIN_CHALLENGE);
+      cookie.deleteNow(c, COOKIE_VALID_USER_REGISTER_PASSKEY);
+      cookie.deleteNow(c, COOKIE_VALID_USER_WITHOUT_PASSKEY);
       return c.text("", 201);
     } catch (err) {
-      deleteCookie(c, COOKIE_DOUBLECHECK_AUTH);
+      cookie.deleteNow(c, COOKIE_DOUBLECHECK_AUTH);
       return c.text("Double authentication check failed", 400);
     }
   })

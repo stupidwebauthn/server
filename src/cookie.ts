@@ -1,5 +1,5 @@
 import { Context } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import * as jose from "jose";
 import { CookieOptions } from "hono/utils/cookie";
 import { HTTPException } from "hono/http-exception";
@@ -41,6 +41,10 @@ export function encodeSecret(secret: string): Uint8Array {
 
 // Methods
 // ----------------------------------------------------------------
+
+export function deleteNow(c: Context, key: string) {
+  deleteCookie(c, key, defaultOptions);
+}
 
 // Create signed cookie, data is stored in unencrypted but verifiable with a signature
 export async function jwtSignCreate<P extends JWTPayload>(
