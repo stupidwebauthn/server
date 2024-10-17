@@ -32,14 +32,14 @@ interface JwtPayloadWithUserIdChallenge extends JWTPayload {
   user_id: number;
 }
 
-const COOKIE_VALID_USER_REGISTER_PASSKEY = "swa_valid_user_register_passkey";
-const COOKIE_VALID_USER_WITHOUT_PASSKEY = "swa_valid_user_without_passkey";
-const COOKIE_LOGIN_CHALLENGE = "swa_login_challenge";
-const COOKIE_DOUBLECHECK_CHALLENGE = "swa_doublecheck_challenge";
-const COOKIE_EMAIL_CHALLENGE = "swa_email_challenge";
-const COOKIE_AUTH = "swa_auth";
-const COOKIE_DOUBLECHECK_AUTH = "swa_doublecheck_auth";
-const COOKIE_CSRF = "swa_csrf";
+const COOKIE_VALID_USER_REGISTER_PASSKEY = config.COOKIE_PREFIX + "valid_user_register_passkey";
+const COOKIE_VALID_USER_WITHOUT_PASSKEY = config.COOKIE_PREFIX + "valid_user_without_passkey";
+const COOKIE_LOGIN_CHALLENGE = config.COOKIE_PREFIX + "login_challenge";
+const COOKIE_DOUBLECHECK_CHALLENGE = config.COOKIE_PREFIX + "doublecheck_challenge";
+const COOKIE_EMAIL_CHALLENGE = config.COOKIE_PREFIX + "email_challenge";
+const COOKIE_AUTH = config.COOKIE_PREFIX + "auth";
+const COOKIE_DOUBLECHECK_AUTH = config.COOKIE_PREFIX + "doublecheck_auth";
+const COOKIE_CSRF = config.COOKIE_PREFIX + "csrf";
 
 const cookie_expires_auth = () => dayjs().add(1, "month").toDate();
 const cookie_expires_auth_nopasskey = () => dayjs().add(1, "day").toDate();
