@@ -23,7 +23,7 @@ export interface Credential {
 export default class DB {
   private db: Database;
   constructor(path: string) {
-    const db = new Database(path, { create: true });
+    const db = new Database(path, { create: true, strict: true });
     migrations(db);
     this.db = db;
   }
