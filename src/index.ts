@@ -549,7 +549,7 @@ const app = new Hono()
       if (err.message) message = err.message;
       else if (typeof err === "string") message = err;
       else if (typeof err === "object") message = JSON.stringify(err);
-      httpEx = new HTTPException(500, { message });
+      httpEx = new HTTPException(500, { message, cause: err });
     }
     return httpEx.getResponse();
   });
