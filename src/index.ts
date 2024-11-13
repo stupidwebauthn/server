@@ -537,6 +537,20 @@ const app = new Hono()
     return c.text(
       "Welcome to Stupid Webauthn!, Generally you shouldn't be seeing this, the webmaster should be proxying /auth/ to http://stupidwebauthn/auth/"
     );
+  })
+
+  .onError((err, c) => {
+    let httpEx: HTTPException;
+    if (err instanceof HTTPException) {
+      httpEx = err;
+    } else {
+      let message = "";
+      if (err.message) message = err.message;
+      else if (typeof err === "string") message = err;
+      else if (typeof err === "object") message = JSON.stringify(err);
+      httpEx = new HTTPException(500, { message });
+    }
+    return httpEx.getResponse();
   });
 
 export default app;
