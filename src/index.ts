@@ -54,7 +54,7 @@ const limiterEmail = rateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
   standardHeaders: "draft-6", // draft-6: `RateLimit-*` headers; draft-7: combined `RateLimit` header
-  keyGenerator: (c) => c.req.query("email") || "", // Method to generate custom identifiers for clients.
+  keyGenerator: (c) => (c.req.query("email") || "").toLowerCase(), // Method to generate custom identifiers for clients.
   // store: ... , // Redis, MemoryStore, etc. See below.
 });
 
@@ -142,6 +142,9 @@ const app = new Hono()
   .get("/auth/register/email/challenge", limiterEmail, async (c) => {
     const email = c.req.query("email");
     if (!email) throw new HTTPException(400, { message: "Invalid email" });
+    if (email !== email.toLowerCase()) {
+      throw new HTTPException(400, { message: "Email must be lowercase" });
+    }
 
     const challenge = server.randomChallenge();
     const url = `${config.EMAIL_VALIDATION_URL}?c=${base64url.encode(challenge)}`;

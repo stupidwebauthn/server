@@ -29,6 +29,7 @@ export default class DB {
   }
 
   userCreateOrFail(email: string): User {
+    email = email.toLowerCase();
     this.db.exec(`INSERT OR IGNORE INTO users (email) values (?)`, [email]);
     const user = this.db.query("SELECT * FROM users WHERE email = ? LIMIT 1").get(email) as User | null;
     if (!user) throw "User not found";
@@ -127,6 +128,10 @@ function migrations(db: Database) {
         used_at         TEXT NOT NULL DEFAULT (datetime()),
         created_at      TEXT NOT NULL DEFAULT (datetime())
       )`);
+    version = incrementDatabaseVersion(db, version);
+  }
+  if (version === 3) {
+    db.exec(`UPDATE users SET email = lower(email)`);
     version = incrementDatabaseVersion(db, version);
   }
 }
