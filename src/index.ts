@@ -54,7 +54,7 @@ const limiterEmail = rateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
   standardHeaders: "draft-6", // draft-6: `RateLimit-*` headers; draft-7: combined `RateLimit` header
-  keyGenerator: (c) => (c.req.query("email") || "").toLowerCase(), // Method to generate custom identifiers for clients.
+  keyGenerator: (c) => c.req.query("email")?.toLowerCase() || "", // Method to generate custom identifiers for clients.
   // store: ... , // Redis, MemoryStore, etc. See below.
 });
 
@@ -287,8 +287,9 @@ const app = new Hono()
   })
 
   .get("/auth/login/challenge", async (c) => {
-    const email = c.req.query("email");
+    let email = c.req.query("email");
     if (!email) throw new HTTPException(401, { message: "Invalid email" });
+    email = email.toLowerCase();
 
     const user = await db.userGetByEmail(email);
     const credentials = await db.credentialInfosByUserId(user.id);
