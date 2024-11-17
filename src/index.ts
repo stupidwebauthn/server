@@ -13,7 +13,7 @@ import config from "./config";
 import base64url from "base64-url";
 import { createMiddleware } from "hono/factory";
 import { userToJson } from "./utils";
-import Cron from "croner";
+import { Cron } from "croner";
 import { rateLimiter } from "hono-rate-limiter";
 
 interface JwtPayloadWithEmail extends JWTPayload {
@@ -60,7 +60,7 @@ const limiterEmail = rateLimiter({
 
 const db = new DB(config.DATABASE_PATH!);
 
-Cron("@daily", () => {
+new Cron("@daily", () => {
   console.info("Running daily cron");
   db.userGdprDeleteEnact();
 }).trigger();
@@ -549,12 +549,10 @@ const app = new Hono()
       if (err.message) message = err.message;
       else if (typeof err === "string") message = err;
       else if (typeof err === "object") message = JSON.stringify(err);
+      console.error(message);
       httpEx = new HTTPException(500, { message, cause: err });
     }
     return httpEx.getResponse();
   });
 
-export default {
-  ...app,
-  idleTimeout: 60,
-};
+export default app;

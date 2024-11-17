@@ -4,13 +4,14 @@
   "scripts": {
     "test": "bun test",
     "start": "bun run src/index.ts",
+    "simple": "bun run src/simple.ts",
     "dev": "bun run --hot src/index.ts"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.2.2",
+    "@hono/zod-validator": "^0.4.1",
     "@passwordless-id/webauthn": "^2.1.2",
     "base64-url": "^2.3.3",
-    "croner": "^8.1.2",
+    "croner": "^9.0.0",
     "dayjs": "^1.11.13",
     "hono": "^4.6.10",
     "hono-rate-limiter": "^0.4.0",

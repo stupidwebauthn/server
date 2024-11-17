@@ -4,3 +4,4 @@ node_modules/
 data/email.html
 data/db.sqlite
 .DS_Store
+/app
