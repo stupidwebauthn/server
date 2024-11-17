@@ -554,4 +554,7 @@ const app = new Hono()
     return httpEx.getResponse();
   });
 
-export default app;
+export default {
+  ...app,
+  idleTimeout: 60,
+};
