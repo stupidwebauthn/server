@@ -149,5 +149,6 @@ function getDatabaseVersion(db: Database): number {
 function incrementDatabaseVersion(db: Database, currentVersion: number): number {
   let version = currentVersion + 1;
   db.exec(`PRAGMA user_version = ${version}`);
+  console.info("migration successful:", version);
   return version;
 }
